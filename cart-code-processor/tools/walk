@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# walk — file-by-file code processor
+#
+# Drives the LLM through a codebase one file at a time.
+# The LLM does not decide which file to process next. This tool does.
+#
+# Usage:
+#   walk init <root> [--exclude <pattern>]...   Initialize a walk over a directory tree
+#   walk next                                    Print the next file to process
+#   walk done                                    Mark the current file as processed
+#   walk skip                                    Skip the current file
+#   walk status                                  Print progress
+#   walk reset                                   Start over
+#   walk index                                   Print the full file list
+#
+# State is stored in workspace/.walk/
+
+WORKSPACE="$(pwd)/workspace"
+WALK_DIR="$WORKSPACE/.walk"
+FILE_LIST="$WALK_DIR/files.txt"
+CURSOR="$WALK_DIR/cursor"
+PROCESSED="$WALK_DIR/processed.txt"
+SKIPPED="$WALK_DIR/skipped.txt"
+LOG="$WORKSPACE/log.md"
+REFRESH_INTERVAL="${WALK_REFRESH_INTERVAL:-20}"
+
+log() {
+  local now
+  now=$(date +%s)
+  echo "$now [walk-script] $*" >> "$LOG"
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  init)
+    root="${1:?Usage: walk init <root>}"
+    shift
+    force=false
+    excludes=()
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --force) force=true; shift ;;
+        --exclude) excludes+=("-not" "-path" "$2"); shift 2 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
+      esac
+    done
+    if [ -f "$CURSOR" ] && [ "$force" != "true" ]; then
+      pos=$(cat "$CURSOR")
+      total=$(wc -l < "$FILE_LIST")
+      remaining=$((total - pos))
+      log "init called — RESUMING at $pos/$total"
+      echo "RESUMING existing walk: $remaining of $total files remaining. Use --force to start over."
+      exit 0
+    fi
+    mkdir -p "$WALK_DIR"
+    find "$root" -type f -name '*.nim' "${excludes[@]}" | sort > "$FILE_LIST"
+    echo "0" > "$CURSOR"
+    : > "$PROCESSED"
+    : > "$SKIPPED"
+    total=$(wc -l < "$FILE_LIST")
+    log "init $root — $total files"
+    echo "Initialized walk: $total files from $root"
+    ;;
+
+  next)
+    [ -f "$CURSOR" ] || { echo "No walk initialized. Run: walk init <root>" >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    total=$(wc -l < "$FILE_LIST")
+    if [ "$pos" -ge "$total" ]; then
+      log "next — DONE"
+      echo "DONE"
+      exit 0
+    fi
+    line=$((pos + 1))
+    file=$(sed -n "${line}p" "$FILE_LIST")
+    now=$(date +%s)
+    log "next — $file ($((pos + 1))/$total)"
+    echo "[$now] $file"
+    ;;
+
+  done)
+    [ -f "$CURSOR" ] || { echo "No walk initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    line=$((pos + 1))
+    file=$(sed -n "${line}p" "$FILE_LIST")
+    sed -n "${line}p" "$FILE_LIST" >> "$PROCESSED"
+    newpos=$((pos + 1))
+    echo "$newpos" > "$CURSOR"
+    remaining=$(( $(wc -l < "$FILE_LIST") - newpos ))
+    now=$(date +%s)
+    log "done — $file"
+    echo "[$now] OK ($remaining remaining). Log walk-exit to workspace/log.md now."
+    if [ "$REFRESH_INTERVAL" -gt 0 ] && [ $((newpos % REFRESH_INTERVAL)) -eq 0 ]; then
+      echo "REFRESH: Re-read the program stack now (kernel.md, cart manifests, task.md, learnings.md)."
+    fi
+    ;;
+
+  skip)
+    [ -f "$CURSOR" ] || { echo "No walk initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    line=$((pos + 1))
+    file=$(sed -n "${line}p" "$FILE_LIST")
+    sed -n "${line}p" "$FILE_LIST" >> "$SKIPPED"
+    echo $((pos + 1)) > "$CURSOR"
+    remaining=$(( $(wc -l < "$FILE_LIST") - pos - 1 ))
+    now=$(date +%s)
+    log "skip — $file"
+    echo "[$now] Skipped ($remaining remaining)"
+    ;;
+
+  status)
+    [ -f "$CURSOR" ] || { echo "No walk initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    total=$(wc -l < "$FILE_LIST")
+    processed=$(wc -l < "$PROCESSED")
+    skipped=$(wc -l < "$SKIPPED")
+    remaining=$((total - pos))
+    echo "Total: $total | Processed: $processed | Skipped: $skipped | Remaining: $remaining"
+    ;;
+
+  reset)
+    [ -f "$CURSOR" ] || { echo "No walk initialized." >&2; exit 1; }
+    echo "0" > "$CURSOR"
+    : > "$PROCESSED"
+    : > "$SKIPPED"
+    total=$(wc -l < "$FILE_LIST")
+    log "reset — $total files"
+    echo "Reset. $total files to process."
+    ;;
+
+  index)
+    [ -f "$FILE_LIST" ] || { echo "No walk initialized." >&2; exit 1; }
+    cat "$FILE_LIST"
+    ;;
+
+  help|*)
+    echo "Usage: walk {init|next|done|skip|status|reset|index}"
+    ;;
+esac

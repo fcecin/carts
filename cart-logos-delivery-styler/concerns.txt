@@ -1,0 +1,79 @@
+# Style concerns extracted from status-im/nim-style-guide
+# Format: <name> | <description> [<source>] | <verify command>
+# The verify command runs against {file}. Empty third field = no verify.
+# Lines starting with # are comments. Blank lines are ignored.
+
+# Imports
+Import grouping | imports must be grouped: std/ first, then external packages, then local relative paths [language.import.md] | grep -n "^import" {file}
+Import paths | standard library imports must be prefixed with std/; external deps use full package name; local deps use relative paths [language.import.md] | grep -n "^import\|^  [a-z]" {file}
+No include | avoid include; prefer import [language.import.md] | grep -n "^include " {file}
+Minimal imports | import a minimal set of modules; avoid importing unused modules [language.import.md] |
+Export reexport | export all modules whose types appear in public symbols of the current module [language.import.md] | grep -n "^export\|proc.*\*\|func.*\*\|type.*\*" {file}
+
+# Error handling
+Raises push | every module must have {.push raises: [], gcsafe.} at top level [errors.exceptions.md] | head -5 {file} | grep -c "push raises"
+Public raises annotation | every public (*) function must have an explicit {.raises.} annotation [errors.exceptions.md] | grep -n "proc.*\*\|func.*\*" {file}
+Prefer Result over exceptions | prefer bool, Opt, or Result to signal failure outcomes [errors.result.md] | grep -n "raise \|raise(" {file}
+Specific exception catch | catch the most specific exception type; avoid catching CatchableError broadly [errors.exceptions.md] | grep -n "except CatchableError\|except Exception\|except:" {file}
+Exception inside loop | place try/except inside loops to avoid partial loop evaluations [errors.exceptions.md] | grep -n "try:\|except\|for \|while " {file}
+Defect catch restriction | do not catch Defect except in tests [errors.exceptions.md] | grep -n "except Defect\|except .*Defect" {file}
+No status codes | avoid status code enums that mix success and error returns [errors.status.md] | grep -n "enum" {file}
+Result error type choice | use cstring errors for diagnostic-only messages; use enum when error kind matters [libraries.results.md] | grep -n "Result\[" {file}
+Use Opt for simple failure | use Opt for simple functions that fail only in trivial ways [libraries.results.md] | grep -n "Option\[" {file}
+
+# Naming
+Exception type naming | CatchableError subtypes must be named XxxError; Defect subtypes XxxDefect [formatting.naming.md] | grep -n "of CatchableError\|of Defect" {file}
+Ref type naming | ref object types must use the XxxRef naming convention [formatting.naming.md] | grep -n "= ref object\|= ref [A-Z]" {file}
+Constructor naming init | constructors returning the type itself must be named func init(T: type Xxx, ...) [formatting.naming.md] | grep -n "proc init\|func init\|proc new\|func new" {file}
+Constructor naming new | constructors returning ref T must be named func new(T: type Xxx, ...) [formatting.naming.md] | grep -n "proc new\|func new" {file}
+Identifier style consistency | all uses of an identifier must match the declaration capitalization [formatting.naming.md] |
+
+# Procedures and functions
+Func over proc | prefer func over proc; use proc only when side effects cannot be avoided [language.proc.md] | grep -n "^proc \|^ *proc " {file}
+Minimize public symbols | avoid public (*) on non-API symbols [language.proc.md] | grep -cn "\*" {file}
+Prefer openArray | prefer openArray over seq for traversal parameters [language.proc.md] | grep -n "seq\[" {file}
+Proc type annotations | annotate proc type definitions with {.raises: [], gcsafe.} [language.proctypes.md] | grep -n "= proc\|: proc" {file}
+
+# Language features to avoid
+No converters | do not use converter declarations [language.converters.md] | grep -n "^converter " {file}
+No finalizers | do not use finalizers [language.finalizers.md] | grep -n "new(.*," {file}
+No inline pragma | avoid explicit {.inline.} [language.inline.md] | grep -n "inline" {file}
+No methods | avoid method [language.methods.md] | grep -n "^method " {file}
+No range types | avoid range types [language.range.md] | grep -n "range\[" {file}
+Macro restraint | be judicious with macros [language.macros.md] | grep -n "^macro " {file}
+No macro public API | avoid generating public API functions with macros [language.macros.md] | grep -n "^macro.*\*" {file}
+
+# Integers
+No Natural | avoid Natural type [language.integers.md] | grep -n "Natural" {file}
+Signed for counting | use signed integers for counting and indexing [language.integers.md] | grep -n "uint\|uint64\|uint32" {file}
+Unsigned for binary | use unsigned integers for binary data and bit manipulation [language.integers.md] | grep -n "byte\|uint8\|uint16\|uint32\|uint64" {file}
+No pointer to int cast | do not cast pointers to int [language.integers.md] | grep -n "cast\[int\]\|cast\[uint\]" {file}
+Range check before int conversion | perform range checks before unsigned to signed conversion [language.integers.md] | grep -n "\.int\b\|int(" {file}
+Length comparison direction | when comparing lengths to unsigned, convert length to unsigned [language.integers.md] | grep -n "\.len.*<\|\.len.*>" {file}
+
+# Variables and declarations
+Avoid result variable | do not use the implicit result variable [language.result.md] | grep -n "^  result\b\|^  result " {file}
+Expression-based init | prefer expressions to initialize variables [language.varinit.md] | grep -n "^  var [a-z]" {file}
+Const let var strictness | use the most restrictive of const, let, var [language.vardecl.md] | grep -n "^var \|^  var " {file}
+
+# Objects and types
+Object construction style | use Type(field: value) or Type.init(...); avoid var + field-by-field mutation [language.objconstr.md] |
+Default zero-init valid | prefer that default 0-initialization is a valid state [language.objconstr.md] |
+Avoid ref object | avoid ref object unless needed for handles or shared ownership [language.refobject.md] | grep -n "= ref object" {file}
+Explicit ref | prefer explicit ref MyType at usage site over ref object definitions [language.refobject.md] | grep -n "= ref object" {file}
+
+# Data types
+Binary data as byte | use byte and seq[byte] for binary data; do not use string [language.binary.md] | grep -n "string" {file}
+String not for binary | string type is for text only [language.string.md] | grep -n "string" {file}
+Hex lowercase | print hex output in lowercase [libraries.hex.md] | grep -n "toHex\|0x[0-9A-F]" {file}
+
+# Memory
+Stack allocation preference | prefer stack-based and statically sized data types in core libraries [language.memory.md] |
+No alloca | do not use alloca [language.memory.md] | grep -n "alloca" {file}
+
+# Libraries
+Stdlib replacements | use chronos over async, stew/bitops2 over bitops, stew/endians2 over endians [libraries.std.md] | grep -n "import.*std/async\|import.*bitops$\|import.*endians$\|import.*streams$" {file}
+Prefer stew over std | when similar libraries exist in std and stew, prefer stew [libraries.stew.md] | grep -n "import.*std/" {file}
+
+# Wrapping
+C wrapper naming | name raw C interface files xxx_abi.nim [libraries.wrappers.md] | grep -n "importc\|cdecl" {file}

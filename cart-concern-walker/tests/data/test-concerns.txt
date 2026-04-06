@@ -1,0 +1,7 @@
+# Test concerns file
+# Tests pipe parsing, verify commands, pipes in commands, empty verify
+
+Simple check | just a description [source.md] | grep -n "hello" {file}
+No verify | this concern has no verify command [source.md] |
+Pipe in command | check raises push [source.md] | head -3 {file} | grep -c "push"
+Trailing empty | another no-verify [source.md]

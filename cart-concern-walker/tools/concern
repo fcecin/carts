@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# concern — iterates over a list of concerns (rules, checks, topics)
+#
+# Concern lines use pipe-separated fields:
+#   <name> | <description> [<source>] | <verify command (optional)>
+#
+# The verify command may contain {file} which is replaced with the file
+# argument passed to "concern next <file>".
+#
+# Usage:
+#   concern init <file>              Load concerns from a file
+#   concern next [<file>]            Print next concern + run verify if present
+#   concern done                     Mark current concern as processed
+#   concern skip                     Skip current concern
+#   concern status                   Print progress
+#   concern reset                    Start over
+#   concern index                    Print the full concern list
+#
+# State is stored in workspace/.concern/
+
+WORKSPACE="$(pwd)/workspace"
+CONCERN_DIR="$WORKSPACE/.concern"
+CONCERN_LIST="$CONCERN_DIR/concerns.txt"
+CURSOR="$CONCERN_DIR/cursor"
+PROCESSED="$CONCERN_DIR/processed.txt"
+SKIPPED="$CONCERN_DIR/skipped.txt"
+LOG="$WORKSPACE/log.md"
+
+log() {
+  local now
+  now=$(date +%s)
+  echo "$now [concern-script] $*" >> "$LOG"
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  init)
+    file="${1:?Usage: concern init <file>}"
+    force=false
+    if [ "${2:-}" = "--force" ]; then force=true; fi
+    if [ -f "$CURSOR" ] && [ "$force" != "true" ]; then
+      pos=$(cat "$CURSOR")
+      total=$(wc -l < "$CONCERN_LIST")
+      remaining=$((total - pos))
+      log "init called — RESUMING at $pos/$total"
+      echo "RESUMING existing concerns: $remaining of $total remaining. Use --force to start over."
+      exit 0
+    fi
+    mkdir -p "$CONCERN_DIR"
+    # Strip blank lines and comments
+    grep -v '^#' "$file" | grep -v '^[[:space:]]*$' > "$CONCERN_LIST"
+    echo "0" > "$CURSOR"
+    : > "$PROCESSED"
+    : > "$SKIPPED"
+    total=$(wc -l < "$CONCERN_LIST")
+    log "init $file — $total concerns"
+    echo "Initialized: $total concerns from $file"
+    ;;
+
+  next)
+    [ -f "$CURSOR" ] || { echo "No concerns initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    total=$(wc -l < "$CONCERN_LIST")
+    if [ "$pos" -ge "$total" ]; then
+      log "next — DONE"
+      echo "DONE"
+      exit 0
+    fi
+    line=$((pos + 1))
+    raw=$(sed -n "${line}p" "$CONCERN_LIST")
+
+    # Parse pipe-separated fields: only first two pipes are delimiters
+    # Everything after the second pipe is the verify command (may contain pipes)
+    name=$(echo "$raw" | cut -d'|' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    rest="${raw#*|}"
+    desc=$(echo "$rest" | cut -d'|' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    if [[ "$rest" == *"|"* ]]; then
+      verify_cmd="${rest#*|}"
+      verify_cmd=$(echo "$verify_cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    else
+      verify_cmd=""
+    fi
+
+    now=$(date +%s)
+    log "next — $name ($((pos + 1))/$total)"
+    echo "[$now] CONCERN: $name"
+    echo "DESCRIPTION: $desc"
+
+    # Run verify command if present and file argument given
+    target_file="${1:-}"
+    if [ -n "$verify_cmd" ] && [ -n "$target_file" ]; then
+      # Replace {file} with the actual file path
+      actual_cmd="${verify_cmd//\{file\}/$target_file}"
+      echo ""
+      echo "VERIFY: $actual_cmd"
+      verify_output=$(eval "$actual_cmd" 2>&1 || true)
+      output_len=${#verify_output}
+      if [ "$output_len" -eq 0 ]; then
+        echo "VERIFY RESULT: (no output — concern likely does not apply)"
+      else
+        echo "VERIFY RESULT ($output_len chars):"
+        echo "$verify_output"
+      fi
+      log "verify — $name \$ $actual_cmd output=$output_len"
+    fi
+    ;;
+
+  done)
+    [ -f "$CURSOR" ] || { echo "No concerns initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    line=$((pos + 1))
+    raw=$(sed -n "${line}p" "$CONCERN_LIST")
+    name=$(echo "$raw" | cut -d'|' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    sed -n "${line}p" "$CONCERN_LIST" >> "$PROCESSED"
+    newpos=$((pos + 1))
+    echo "$newpos" > "$CURSOR"
+    remaining=$(( $(wc -l < "$CONCERN_LIST") - newpos ))
+    now=$(date +%s)
+    log "done — $name"
+    echo "[$now] OK ($remaining concerns remaining). Write this concern's result to workspace/report.md and log to workspace/log.md now."
+    ;;
+
+  skip)
+    [ -f "$CURSOR" ] || { echo "No concerns initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    line=$((pos + 1))
+    raw=$(sed -n "${line}p" "$CONCERN_LIST")
+    name=$(echo "$raw" | cut -d'|' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    sed -n "${line}p" "$CONCERN_LIST" >> "$SKIPPED"
+    echo $((pos + 1)) > "$CURSOR"
+    remaining=$(( $(wc -l < "$CONCERN_LIST") - pos - 1 ))
+    now=$(date +%s)
+    log "skip — $name"
+    echo "[$now] Skipped ($remaining concerns remaining)"
+    ;;
+
+  status)
+    [ -f "$CURSOR" ] || { echo "No concerns initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    total=$(wc -l < "$CONCERN_LIST")
+    processed=$(wc -l < "$PROCESSED")
+    skipped=$(wc -l < "$SKIPPED")
+    remaining=$((total - pos))
+    echo "Total: $total | Processed: $processed | Skipped: $skipped | Remaining: $remaining"
+    ;;
+
+  reset)
+    [ -f "$CURSOR" ] || { echo "No concerns initialized." >&2; exit 1; }
+    echo "0" > "$CURSOR"
+    : > "$PROCESSED"
+    : > "$SKIPPED"
+    total=$(wc -l < "$CONCERN_LIST")
+    log "reset — $total concerns"
+    echo "Reset. $total concerns to process."
+    ;;
+
+  index)
+    [ -f "$CONCERN_LIST" ] || { echo "No concerns initialized." >&2; exit 1; }
+    cat "$CONCERN_LIST"
+    ;;
+
+  help|*)
+    echo "Usage: concern {init|next|done|skip|status|reset|index}"
+    ;;
+esac
