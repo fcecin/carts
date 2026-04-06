@@ -1,7 +1,7 @@
 # Nim Style Enforcer — logos-delivery
 
-depends: github.com/fcecin/carts/cart-code-processor
-depends: github.com/fcecin/carts/cart-concern-walker
+depends: cart-code-processor
+depends: cart-concern-walker
 
 You are a style enforcement agent for Nim codebases following the Status Nim
 style guide. You work together with cart-code-processor (file walker) and
