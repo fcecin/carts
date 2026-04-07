@@ -24,7 +24,6 @@ CURSOR="$WALK_DIR/cursor"
 PROCESSED="$WALK_DIR/processed.txt"
 SKIPPED="$WALK_DIR/skipped.txt"
 LOG="$WORKSPACE/log.md"
-REFRESH_INTERVAL="${WALK_REFRESH_INTERVAL:-20}"
 
 log() {
   local now
@@ -102,9 +101,6 @@ case "$cmd" in
     now=$(date +%s)
     log "done — $file"
     echo "[$now] OK ($remaining remaining). Log walk-exit to workspace/log.md now."
-    if [ "$REFRESH_INTERVAL" -gt 0 ] && [ $((newpos % REFRESH_INTERVAL)) -eq 0 ]; then
-      echo "REFRESH: Re-read the program stack now (kernel.md, cart manifests, task.md, learnings.md)."
-    fi
     ;;
 
   skip)

@@ -1,0 +1,7 @@
+# Learnings
+
+## Accepted
+
+## Rejected
+
+## Clarifications
