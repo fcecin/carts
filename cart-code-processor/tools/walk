@@ -40,10 +40,14 @@ case "$cmd" in
     root="${1:?Usage: walk init <root>}"
     shift
     force=false
+    maxdepth=""
+    file_pattern="*.nim"
     excludes=()
     while [ $# -gt 0 ]; do
       case "$1" in
         --force) force=true; shift ;;
+        --maxdepth) maxdepth="$2"; shift 2 ;;
+        --pattern) file_pattern="$2"; shift 2 ;;
         --exclude) excludes+=("-not" "-path" "$2"); shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
       esac
@@ -57,7 +61,11 @@ case "$cmd" in
       exit 0
     fi
     mkdir -p "$WALK_DIR"
-    find "$root" -type f -name '*.nim' "${excludes[@]}" | sort > "$FILE_LIST"
+    depth_args=()
+    if [ -n "$maxdepth" ]; then
+      depth_args=("-maxdepth" "$maxdepth")
+    fi
+    find "$root" "${depth_args[@]}" -type f -name "$file_pattern" "${excludes[@]}" | sort > "$FILE_LIST"
     echo "0" > "$CURSOR"
     : > "$PROCESSED"
     : > "$SKIPPED"

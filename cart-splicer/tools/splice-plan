@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# splice-plan — generate a splice plan from a directory tree
+#
+# Scans for directories containing target files, outputs one scope per line,
+# sorted by file count (smallest first). Only outputs leaf directories —
+# directories where all matching files are directly in that directory, not
+# in subdirectories. This prevents parent scopes from overlapping with
+# child scopes.
+#
+# Usage: splice-plan <root> [--pattern <glob>] [--exclude <pattern>]...
+#
+# Output goes to stdout. Redirect to a file:
+#   splice-plan workspace/myrepo > workspace/splice-plan.txt
+
+root="${1:?Usage: splice-plan <root> [--pattern <glob>] [--exclude <pattern>]...}"
+shift
+
+pattern="*.nim"
+excludes=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --pattern) pattern="$2"; shift 2 ;;
+    --exclude) excludes+=("-not" "-path" "$2"); shift 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+# Find all directories containing matching files directly (not via subdirs)
+# For each matching file, get its directory. Then for each directory, count
+# only files directly in it (maxdepth 1). Output dirs that have at least
+# one direct file, sorted by count.
+find "$root" -type f -name "$pattern" "${excludes[@]}" \
+  | sed 's|/[^/]*$||' \
+  | sort -u \
+  | while read -r dir; do
+    count=$(find "$dir" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | wc -l)
+    if [ "$count" -gt 0 ]; then
+      echo "$count $dir"
+    fi
+  done \
+  | sort -n \
+  | awk '{print $2}'

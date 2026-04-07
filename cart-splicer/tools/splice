@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# splice — manages work segments on top of the file walker
+#
+# A splice plan is a text file with one directory scope per line.
+# The splicer tracks which scopes are done and initializes the walker
+# for the current scope.
+#
+# Usage:
+#   splice init <plan-file>       Load a splice plan
+#   splice current                Print the current scope
+#   splice done                   Mark current scope as done, advance
+#   splice status                 Print progress
+#   splice reset                  Start over
+#
+# State is stored in workspace/.splice/
+
+WORKSPACE="$(pwd)/workspace"
+SPLICE_DIR="$WORKSPACE/.splice"
+PLAN="$SPLICE_DIR/plan.txt"
+CURSOR="$SPLICE_DIR/cursor"
+COMPLETED="$SPLICE_DIR/completed.txt"
+LOG="$WORKSPACE/log.md"
+
+log() {
+  local now
+  now=$(date +%s)
+  echo "$now [splice-script] $*" >> "$LOG"
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  init)
+    file="${1:?Usage: splice init <plan-file>}"
+    force=false
+    if [ "${2:-}" = "--force" ]; then force=true; fi
+    if [ -f "$CURSOR" ] && [ "$force" != "true" ]; then
+      pos=$(cat "$CURSOR")
+      total=$(wc -l < "$PLAN")
+      remaining=$((total - pos))
+      scope=$(sed -n "$((pos + 1))p" "$PLAN")
+      log "init called — RESUMING at scope $((pos + 1))/$total: $scope"
+      echo "RESUMING splice: scope $((pos + 1)) of $total — $scope"
+      echo "Use --force to start over."
+      exit 0
+    fi
+    mkdir -p "$SPLICE_DIR"
+    grep -v '^#' "$file" | grep -v '^[[:space:]]*$' > "$PLAN"
+    echo "0" > "$CURSOR"
+    : > "$COMPLETED"
+    total=$(wc -l < "$PLAN")
+    log "init $file — $total scopes"
+    echo "Initialized splice: $total scopes from $file"
+    ;;
+
+  current)
+    [ -f "$CURSOR" ] || { echo "No splice initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    total=$(wc -l < "$PLAN")
+    if [ "$pos" -ge "$total" ]; then
+      log "current — ALL SCOPES DONE"
+      echo "ALL SCOPES DONE"
+      exit 0
+    fi
+    line=$((pos + 1))
+    scope=$(sed -n "${line}p" "$PLAN")
+    now=$(date +%s)
+    log "current — scope $line/$total: $scope"
+    echo "[$now] SCOPE $line/$total: $scope"
+    ;;
+
+  done)
+    [ -f "$CURSOR" ] || { echo "No splice initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    line=$((pos + 1))
+    scope=$(sed -n "${line}p" "$PLAN")
+    echo "$scope" >> "$COMPLETED"
+    newpos=$((pos + 1))
+    echo "$newpos" > "$CURSOR"
+    total=$(wc -l < "$PLAN")
+    remaining=$((total - newpos))
+    now=$(date +%s)
+    log "done — scope $line: $scope ($remaining remaining)"
+    echo "[$now] Scope done ($remaining scopes remaining)."
+    if [ "$remaining" -eq 0 ]; then
+      echo "ALL SCOPES DONE."
+    fi
+    ;;
+
+  status)
+    [ -f "$CURSOR" ] || { echo "No splice initialized." >&2; exit 1; }
+    pos=$(cat "$CURSOR")
+    total=$(wc -l < "$PLAN")
+    completed=$(wc -l < "$COMPLETED")
+    remaining=$((total - pos))
+    echo "Total: $total | Completed: $completed | Remaining: $remaining"
+    if [ "$pos" -lt "$total" ]; then
+      scope=$(sed -n "$((pos + 1))p" "$PLAN")
+      echo "Current scope: $scope"
+    fi
+    ;;
+
+  reset)
+    [ -f "$CURSOR" ] || { echo "No splice initialized." >&2; exit 1; }
+    echo "0" > "$CURSOR"
+    : > "$COMPLETED"
+    total=$(wc -l < "$PLAN")
+    log "reset — $total scopes"
+    echo "Reset. $total scopes to process."
+    ;;
+
+  help|*)
+    echo "Usage: splice {init|current|done|status|reset}"
+    ;;
+esac
