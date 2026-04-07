@@ -63,19 +63,21 @@ one scope, then stops.
    b. Read the file.
    c. `concern reset` — restart the concern walker.
    d. For each concern (inner loop):
-      i.  `concern next <file>` — the tool prints the concern description
-          and runs the verify command if one exists.
-      ii. Three cases:
-          - VERIFY RETURNED OUTPUT: inspect the output. Decide if it is a
-            real violation. If so, fix it (re-read the file first if you
-            modified it in a previous concern iteration).
-          - VERIFY RETURNED NOTHING: the concern likely does not apply.
-            Call `concern done` and move on quickly.
-          - NO VERIFY COMMAND: YOU must analyze the file for this concern.
-            Read the relevant code. Think about whether the concern applies.
-            This is where your judgment matters — do not skip these.
-      iii. Check ONLY this concern. Do not fix other issues you notice.
-      iv. `concern done`
+      i.   `concern next <file>` — the tool prints the concern description
+           and runs the verify command if one exists.
+      ii.  STEP 1 — TOOL-GUIDED INSPECTION: if the verify command returned
+           output, use it to guide your eyes into the file. Go to the lines
+           the tool flagged. Check if they are real violations. Fix what you
+           find. If verify returned nothing, the tool found no obvious hits
+           — proceed to step 2.
+      iii. STEP 2 — MANUAL SCAN: regardless of what the tool found, scan
+           the file yourself from your understanding of the concern. The
+           verify command is a grep — it can miss things. Look for instances
+           the tool did not catch. If you find something the tool missed,
+           fix it AND log the tool weakness to learnings.md so the verify
+           command can be improved later.
+      iv.  Check ONLY this concern. Do not fix other issues you notice.
+      v.   `concern done`
    e. After all concerns: run nph on the file if any changes were made.
       Then `walk done`.
 4. `splice done` — mark this scope as finished.
