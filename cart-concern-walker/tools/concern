@@ -121,7 +121,7 @@ case "$cmd" in
     remaining=$(( $(wc -l < "$CONCERN_LIST") - newpos ))
     now=$(date +%s)
     log "done — $name"
-    echo "[$now] OK ($remaining concerns remaining). Write this concern's result to workspace/report.md and log to workspace/log.md now."
+    echo "[$now] OK ($remaining concerns remaining). Use <golem>/tools/append to write to workspace/report.md and workspace/log.md. Do NOT read these files."
     ;;
 
   skip)
