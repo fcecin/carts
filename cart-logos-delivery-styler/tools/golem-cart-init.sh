@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
+# Initializes a work directory for Nim style enforcement using the Status Nim style guide.
 set -euo pipefail
 
-# golem-cart-init.sh for cart-logos-delivery-styler
 #
 # This script sets up a golem work directory for Nim style enforcement using
 # the Status Nim style guide. It is called by `golem cart-init styler <dir>`.
