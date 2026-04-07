@@ -35,10 +35,12 @@ For each scope:
    Use `--maxdepth 1` so the walker only picks up files directly in this
    scope directory, not in subdirectories (those are separate scopes).
    Use `--force` because each scope needs a fresh walker initialization.
-3. Process all files in this scope using the walker protocol.
-4. When `walk next` prints DONE, this scope is finished.
-5. `splice done` — advance to the next scope.
-6. Stop the session. The next `golem run` will pick up at the next scope.
+3. Re-initialize any other iterators (e.g. concern walker) with `--force`
+   as well. Each scope starts with a clean slate for all tools.
+4. Process all files in this scope using the walker protocol.
+5. When `walk next` prints DONE, this scope is finished.
+6. `splice done` — advance to the next scope.
+7. Stop the session. The next `golem run` will pick up at the next scope.
 
 ### One scope per session
 
