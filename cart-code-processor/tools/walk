@@ -100,7 +100,7 @@ case "$cmd" in
     remaining=$(( $(wc -l < "$FILE_LIST") - newpos ))
     now=$(date +%s)
     log "done — $file"
-    echo "[$now] OK ($remaining remaining). Log walk-exit to workspace/log.md now."
+    echo "[$now] OK ($remaining remaining). Use <golem>/tools/append to log walk-exit to workspace/log.md and write results to workspace/report.md. Do NOT read these files."
     ;;
 
   skip)

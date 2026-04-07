@@ -1,0 +1,2 @@
+isnil-func-call | Convert isNil(expr) function calls to expr.isNil() | grep -nP '(?<!\.)isNil\s*\(' {file}
+isnil-no-parens | Convert expr.isNil without parens to expr.isNil() | grep -nP '\.isNil\b(?!\s*\()' {file}
