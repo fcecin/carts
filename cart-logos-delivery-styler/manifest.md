@@ -71,6 +71,8 @@ The file-stepper enforces one file per session. Each run:
       command can be improved later.
    d. Check ONLY this concern. Do not fix other issues you notice.
    e. `concern done`
+   f. Every 10 concerns, REFRESH: re-read kernel.md, all cart manifests,
+      task.md, and learnings.md from disk before processing the next concern.
 5. After all concerns: run nph on the file if any changes were made.
    Then `walk done`.
 6. Write the session report and stop. The next run picks up the next file.

@@ -40,6 +40,9 @@ you will build them.
 
 ## Phases
 
+Before starting each phase, REFRESH: re-read kernel.md, all cart manifests,
+task.md, and learnings.md from disk.
+
 ### Phase 1: Study
 
 Read task.md to understand what needs to be done. Read the target codebase
