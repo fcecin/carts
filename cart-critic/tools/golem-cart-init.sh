@@ -1,34 +1,25 @@
 #!/usr/bin/env bash
-# Critiques a completed workspace: writes a brutal, unforgiving critique.md with a star rating.
+# APPENDS TO TASK. Adds a post-completion critique phase that writes a brutal critique.md with a star rating.
 set -euo pipefail
 
 CART_DIR="${1:?ERROR: cart directory not provided}"
 
 echo "=== cart-critic init ==="
 echo ""
-echo "This will set up a critique run for the current work directory."
-echo "The critic reads all workspace output (report.md, log.md, diffs)"
-echo "and writes a brutal, honest critique.md with a star rating."
+echo "This appends a critique phase to the existing task.md."
+echo "When the main task completes, the model will load cart-critic"
+echo "and write a brutal, honest critique.md with a star rating."
 echo ""
 
-if [ ! -d "workspace" ]; then
-  echo "ERROR: No workspace/ directory. Nothing to critique." >&2
+if [ ! -f "task.md" ]; then
+  echo "ERROR: No task.md. Run the main cart-init first." >&2
   exit 1
 fi
 
-if [ -f "workspace/critique.md" ]; then
-  echo "critique.md already exists. Delete it first if you want a fresh critique."
+# Check if critic is already appended
+if grep -q "cart-critic" task.md 2>/dev/null; then
+  echo "cart-critic is already in task.md. Nothing to do."
   exit 0
-fi
-
-# Archive current task.md
-if [ -f "task.md" ]; then
-  n=1
-  while [ -f "workspace/reviewed-task-${n}.md" ]; do
-    n=$((n + 1))
-  done
-  cp task.md "workspace/reviewed-task-${n}.md"
-  echo "Archived task.md -> workspace/reviewed-task-${n}.md"
 fi
 
 # Figure out cart path
@@ -37,15 +28,18 @@ if [[ "$CART_DIR" == */cartridges/* ]]; then
   CART_REL="${CART_DIR##*/cartridges/}"
 fi
 
-cat > task.md << TASK
-# Task: Critique workspace
+cat >> task.md << TASK
 
-cartridge: ${CART_REL:-cart-critic}
+## After completion: critique
 
-Review this workspace thoroughly and write workspace/critique.md.
+When the main task is fully complete (all scopes done, session report written),
+load the cart-critic cartridge manifest from:
+  \`<golem>/cartridges/${CART_REL}/manifest.md\`
+
+Then follow its instructions to write workspace/critique.md.
+Do not skip this step. The critique is part of the task.
 TASK
 
+echo "Appended critique phase to task.md"
 echo ""
-echo "Wrote critique task.md"
-echo ""
-echo "Next: run 'golem run' to start the critique."
+echo "The critic will run automatically after the main task completes."

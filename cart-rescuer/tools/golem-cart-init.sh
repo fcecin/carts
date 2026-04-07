@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rescues a failed or incomplete workspace: reverts bad changes, writes a new scoped task.md.
+# REPLACES TASK. Rescues a failed or incomplete workspace: reverts bad changes, writes a new scoped task.md.
 set -euo pipefail
 
 # golem-cart-init.sh for cart-rescuer
