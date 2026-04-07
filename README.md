@@ -8,69 +8,92 @@ Install `golem` first, then fetch these carts:
 golem fetch github.com/fcecin/carts
 ```
 
+## cart-doer
+
+General-purpose codebase transformer. Give it any task ("normalize isNil calls", "rename all ref types", "add error handling") and it will study the codebase, build skills from scratch, cache them, test on sample files, then execute across the full codebase. Discovers and uses installed carts at runtime — no hardcoded domain knowledge.
+
+```
+golem init ~/work/my-task
+golem cart-init doer ~/work/my-task
+# describe the task, point to the repo
+golem clauder --dir ~/work/my-task --idle 20 --claude-args="--dangerously-skip-permissions"
+```
+
+Skills are cached in `golem/cache/` and reused across future tasks.
+
+## cart-meta-doer
+
+Promotes doer skills into publishable standalone carts. Run it on a completed doer workspace — it reads the cached skills and workspace evidence, assembles raw materials, then launches a golem session to polish them into a complete cart with manifest, cart-init script, tests, and evidence.
+
+```
+cd ~/work/my-task    # completed doer workspace
+golem cart-init meta-doer .
+# enter cart name, clauder launches automatically
+```
+
+## cart-fixer-isnil
+
+The first cart produced by the doer→meta-doer pipeline. Normalizes Nim `isNil` calls to `.isNil()` method syntax. Pre-scans files with grep to skip non-matching files. Processed 546 files in 20 minutes with zero remaining violations.
+
+```
+golem init ~/work/fix-isnil
+golem cart-init fixer-isnil ~/work/fix-isnil
+golem run
+```
+
 ## cart-logos-delivery-styler
 
-Nim style enforcement for the [logos-delivery](https://github.com/logos-messaging/logos-delivery) codebase using the [Status Nim style guide](https://github.com/status-im/nim-style-guide).
-
-### Workflow
+Nim style enforcement for the [logos-delivery](https://github.com/logos-messaging/logos-delivery) codebase using the [Status Nim style guide](https://github.com/status-im/nim-style-guide). Thorough but expensive — 51 concerns per file, one file per session, 10-15 minutes per file on Opus.
 
 ```
 golem init ~/work/style-run
 golem cart-init styler ~/work/style-run
-# When prompted, enter: https://github.com/logos-messaging/logos-delivery
-cd ~/work/style-run
 golem run
-# Paste the boot phrase when prompted
 ```
 
-Each `golem run` processes one file and stops. Run it again to process the next file. There are typically 500+ files in the codebase, so this takes many sessions.
+### Workspace output
 
-### Performance warning
+- `workspace/report.md` — what was changed per file and per concern
+- `workspace/suggestions.md` — items flagged but not fixed
+- `workspace/log.md` — timestamped activity log (dual-logged by tools and model)
+- `workspace/cheats.md` — protocol deviations the model made
+- `workspace/confusion.md` — ambiguities encountered
+- `workspace/runs/golem-session-report-N.md` — one per session
 
-This cart was developed for thoroughness, not speed. It will obliterate your Claude subscription tokens. Each file is checked against 51 style concerns, each with a two-step process (tool-guided grep inspection + manual code scan by the model). A single file takes 10-15 minutes of Opus time.
+## Infrastructure carts
 
-The goal is for the output to be thorough and correct, not fast or cheap. That said, the output is not compiled and is not guaranteed to be actually thorough or any good. The following workspace files should be inspected to assess quality:
-
-- `workspace/report.md` — what was changed per file and per concern. Every concern gets an entry even if no violations were found.
-- `workspace/suggestions.md` — items the model flagged but did not fix (API breaks, ambiguous cases, things requiring compilation to verify).
-- `workspace/log.md` — timestamped activity log with dual entries from both the tools (unfakeable) and the model. Can be used to detect cheating or skipped work.
-- `workspace/cheats.md` — protocol deviations the model made (if it cut corners, it must document them here).
-- `workspace/confusion.md` — ambiguities the model encountered in the instructions.
-- `workspace/runs/golem-session-report-N.md` — one per session, summarizing what was done and why.
-
-### Companion carts
-
-The styler depends on these carts (fetched automatically as part of the same monorepo):
-
-- **cart-file-stepper** — enforces one file per session to keep context fresh
-- **cart-concern-walker** — iterates through style concerns with verify commands
-- **cart-code-processor** — file-by-file walker with cursor-based state
-
-### Post-run carts
-
-- **cart-critic** — appends to task.md. After the styler finishes, writes a brutal `critique.md` with a 0-5 star rating. Use: `golem cart-init critic ~/work/style-run`
-- **cart-rescuer** — replaces task.md. Rescues a failed or incomplete run by reverting bad changes and writing a new scoped task. Use: `golem cart-init rescuer ~/work/style-run`
-
-## cart-file-stepper
-
-Enforces one file per session. The walker iterates files as usual but the stepper makes the model stop after processing each file. This prevents context degradation on heavy workloads. Depends on cart-code-processor.
-
-## cart-concern-walker
-
-Iterates through a list of concerns (style rules, checks, review topics) one at a time. Concerns are defined in a pipe-separated text file with optional verify commands that run automatically. Logs to `workspace/log.md` with timestamps.
-
-## cart-code-processor
+### cart-code-processor
 
 File-by-file codebase walker. Provides the `walk` tool (init, next, done, skip, status, reset). Cursor-based state persists in `workspace/.walk/` for resume across sessions.
 
-## cart-splicer
+### cart-file-stepper
 
-Splits large file-processing tasks into directory scopes. Each run processes one scope. Provides `splice` and `splice-plan` tools. Used when per-directory granularity is sufficient (lighter workloads than per-file stepping).
+Enforces one file per session. Prevents context degradation on heavy workloads. Depends on cart-code-processor.
 
-## cart-critic
+### cart-concern-walker
 
-Appends a post-completion critique phase to task.md. After the main task finishes, writes `workspace/critique.md` with a detailed analysis and a 0-5 star rating. Brutal and unforgiving.
+Iterates through a list of concerns (style rules, checks, review topics) one at a time. Concerns are defined in a pipe-separated text file with optional verify commands that run automatically.
 
-## cart-rescuer
+### cart-splicer
 
-Replaces task.md. Reviews a failed or incomplete workspace, reverts bad changes, and writes a new task.md scoped for the next productive run. The surgeon of the cart ecosystem.
+Splits large file-processing tasks into directory scopes. Each run processes one scope. Provides `splice` and `splice-plan` tools.
+
+## Post-run carts
+
+### cart-critic
+
+Appends a post-completion critique phase to task.md. Writes a brutal `workspace/critique.md` with a 0-5 star rating.
+
+```
+golem cart-init critic ~/work/style-run
+golem run
+```
+
+### cart-rescuer
+
+Replaces task.md. Reviews a failed or incomplete workspace, reverts bad changes, and writes a new task.md scoped for the next productive run.
+
+```
+golem cart-init rescuer ~/work/style-run
+golem run
+```
