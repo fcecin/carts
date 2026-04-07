@@ -64,11 +64,17 @@ one scope, then stops.
    c. `concern reset` — restart the concern walker.
    d. For each concern (inner loop):
       i.  `concern next <file>` — the tool prints the concern description
-          AND runs the verify command automatically. If verify says
-          "(no output — concern likely does not apply)", move on.
-      ii. Check ONLY this concern against the current file.
-      iii. If there's a violation, fix it (re-read the file first if
-           you modified it in a previous concern iteration).
+          and runs the verify command if one exists.
+      ii. Three cases:
+          - VERIFY RETURNED OUTPUT: inspect the output. Decide if it is a
+            real violation. If so, fix it (re-read the file first if you
+            modified it in a previous concern iteration).
+          - VERIFY RETURNED NOTHING: the concern likely does not apply.
+            Call `concern done` and move on quickly.
+          - NO VERIFY COMMAND: YOU must analyze the file for this concern.
+            Read the relevant code. Think about whether the concern applies.
+            This is where your judgment matters — do not skip these.
+      iii. Check ONLY this concern. Do not fix other issues you notice.
       iv. `concern done`
    e. After all concerns: run nph on the file if any changes were made.
       Then `walk done`.
