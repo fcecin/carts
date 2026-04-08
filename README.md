@@ -78,6 +78,34 @@ Iterates through a list of concerns (style rules, checks, review topics) one at 
 
 Splits large file-processing tasks into directory scopes. Each run processes one scope. Provides `splice` and `splice-plan` tools.
 
+## cart-golem-writer
+
+The golem's own voice. Reads the entire golem installation — kernel, carts, tower essays, cache, local work dirs, laboratory — and writes essays about what it finds. Not documentation. Not changelogs. Essays.
+
+Idea sourcing is driven by task.md (the main thread), with fallbacks to golem state changes, web search seeded by external sources, or silence. The cart will skip a day rather than publish filler.
+
+```
+golem init ~/work/writer
+golem cart-init golem-writer ~/work/writer
+# set up blog archive, idea sources, publishing method
+golem clauder --dir ~/work/writer
+```
+
+Designed for daily cron-triggered runs via clauder.
+
+## cart-daemon
+
+Installs and removes system services on the local machine — cron jobs, systemd timers, systemd units. Surveys the system first, refuses to install packages, prefers user-level over root, stages files before deploying, tests everything, and documents the undo procedure.
+
+```
+golem init ~/work/my-service
+golem cart-init daemon ~/work/my-service
+# describe the service in plain English
+golem run
+```
+
+The undo section in the report is mandatory — every installation is reversible.
+
 ## Post-run carts
 
 ### cart-critic
